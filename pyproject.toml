@@ -1,0 +1,125 @@
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mcp-harness"
+version = "0.1.0"
+description = "Enterprise governance middleware for MCP servers: cost attribution, auth, observability, quotas, audit, and policy — composable around the official MCP Python SDK."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Nagendra Shukla" }]
+keywords = ["mcp", "model-context-protocol", "governance", "observability", "cost-attribution", "middleware", "enterprise"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Topic :: System :: Monitoring",
+    "Typing :: Typed",
+]
+dependencies = [
+    "PyYAML>=6.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/nagenshukla/mcp-harness"
+Repository = "https://github.com/nagenshukla/mcp-harness"
+Issues = "https://github.com/nagenshukla/mcp-harness/issues"
+Changelog = "https://github.com/nagenshukla/mcp-harness/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+# The official MCP SDK. Required to actually serve tools (harness.run()).
+# The core middleware pipeline works without it.
+server = ["mcp>=1.2.0"]
+# OpenTelemetry tracing export.
+otel = [
+    "opentelemetry-api>=1.20",
+    "opentelemetry-sdk>=1.20",
+    "opentelemetry-exporter-otlp>=1.20",
+]
+# Prometheus metrics export.
+metrics = ["prometheus-client>=0.19"]
+# Accurate token counting for cost attribution.
+tokens = ["tiktoken>=0.5"]
+# Distributed quota / rate-limit backend.
+redis = ["redis>=5.0"]
+# JWT validation for AzureADAuth / OAuthAuth.
+auth = ["PyJWT>=2.8", "cryptography>=41"]
+# First-class Azure sinks (experimental).
+azure = ["azure-monitor-opentelemetry>=1.2", "azure-eventhub>=5.11"]
+# Everything a server author is likely to want.
+all = [
+    "mcp>=1.2.0",
+    "opentelemetry-api>=1.20",
+    "opentelemetry-sdk>=1.20",
+    "opentelemetry-exporter-otlp>=1.20",
+    "prometheus-client>=0.19",
+    "tiktoken>=0.5",
+    "PyJWT>=2.8",
+    "cryptography>=41",
+]
+# Development / CI toolchain.
+dev = [
+    "mcp>=1.2.0",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "types-PyYAML>=6.0",
+    "build>=1.2",
+    "twine>=5.0",
+]
+
+[project.scripts]
+mcp-harness = "mcp_harness.cli:main"
+
+[project.entry-points.pytest11]
+mcp_harness = "mcp_harness.testing.fixtures"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mcp_harness"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/tests",
+    "/examples",
+    "/README.md",
+    "/LICENSE",
+    "/CHANGELOG.md",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+filterwarnings = ["error::DeprecationWarning:mcp_harness.*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests", "examples"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "W"]
+ignore = ["B008"]  # function-call-in-default-argument: harmless for our resolver defaults
+
+[tool.ruff.lint.per-file-ignores]
+"examples/*" = ["E402"]
+
+[tool.mypy]
+python_version = "3.10"
+packages = ["mcp_harness"]
+mypy_path = "src"
+ignore_missing_imports = true
+warn_unused_ignores = false
+disallow_untyped_defs = false
