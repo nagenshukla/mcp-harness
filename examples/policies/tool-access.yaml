@@ -1,0 +1,18 @@
+# Allow-list policy for the local governed server.
+# A call is permitted only if one of these rules grants the principal access to the tool.
+default_allow: false
+
+rules:
+  # Finance may read customer data and list orders.
+  - teams: [finance]
+    tools: [search_customer, list_orders]
+
+  # The platform team may call anything that starts with "list_".
+  - teams: [platform]
+    tools: ["list_*"]
+
+  # The reporting service may run the (sensitive) refund tool, but only in the US region.
+  - principals: [svc-reports]
+    tools: [issue_refund]
+    args:
+      region: [us]
