@@ -75,6 +75,20 @@ async def test_allow_list_from_yaml(tmp_path):
     assert await client.call("search_customer", {"customer_id": "c1"})
 
 
+async def test_deny_list_from_yaml(tmp_path):
+    policy = tmp_path / "p.yaml"
+    policy.write_text(
+        "- principals: [svc-bad]\n",
+        encoding="utf-8",
+    )
+    h = _build(DenyList.from_yaml(policy))
+    bad = HarnessTestClient(h, principal=MockPrincipal("svc-bad"))
+    good = HarnessTestClient(h, principal=MockPrincipal("svc-ok"))
+    with pytest.raises(PolicyDenied):
+        await bad.call("search_customer", {"customer_id": "c1"})
+    assert await good.call("search_customer", {"customer_id": "c1"})
+
+
 def test_pii_redactor_patterns():
     r = PIIRedactor()
     assert r.redact_text("reach me at a@b.com") == "reach me at [REDACTED_EMAIL]"
