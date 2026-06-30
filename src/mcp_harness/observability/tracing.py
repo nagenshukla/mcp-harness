@@ -46,6 +46,7 @@ class OTELTracing(BaseMiddleware):
         super().__init__()
         self.service_name = service_name
         self.record_arguments = record_arguments
+        self._tracer: Any | None
         if _OTEL_AVAILABLE:
             self._tracer = _otel_trace.get_tracer("mcp_harness", tracer_provider=tracer_provider)
         else:
