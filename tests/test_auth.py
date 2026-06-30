@@ -79,6 +79,16 @@ async def test_chained_falls_back_to_anonymous():
     assert anon is not None and anon.anonymous
 
 
+async def test_chained_rejects_empty_backends():
+    with pytest.raises(ValueError):
+        ChainedAuth([])
+
+
+async def test_chained_returns_none_when_all_backends_fail():
+    auth = ChainedAuth([APIKeyAuth(keys={"sk-1": {"id": "svc-a"}})])
+    assert await auth.authenticate({}) is None
+
+
 async def test_injected_principal_bypasses_auth():
     from mcp_harness.testing import MockPrincipal
 
