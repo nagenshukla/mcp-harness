@@ -53,6 +53,18 @@ async def test_api_key_loader_supersedes_static_keys():
     assert (await auth.authenticate({"x-api-key": "sk-b"})).id == "svc-b"
 
 
+async def test_api_key_principal_factory_overrides_default_mapping():
+    def make_principal(key, info):
+        from mcp_harness.core.principal import Principal
+
+        return Principal(id=f"custom:{info['id']}", auth_method="api_key")
+
+    auth = APIKeyAuth(keys={"sk-1": {"id": "svc-a"}}, principal_factory=make_principal)
+    principal = await auth.authenticate({"x-api-key": "sk-1"})
+    assert principal is not None
+    assert principal.id == "custom:svc-a"
+
+
 async def test_anonymous_default_allows_calls():
     h = _harness_with(AnonymousAuth())
     assert await h.dispatch("whoami", {}, headers={}) == "ok"
