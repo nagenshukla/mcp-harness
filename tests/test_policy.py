@@ -84,6 +84,12 @@ def test_pii_redactor_patterns():
     assert nested["ok"][1] == "[REDACTED_EMAIL]"
 
 
+def test_pii_redactor_extra_patterns():
+    r = PIIRedactor(extra_patterns={"employee_id": (r"EMP-\d{4}", "[REDACTED_EMPLOYEE_ID]")})
+    assert r.redact_text("badge EMP-1234") == "badge [REDACTED_EMPLOYEE_ID]"
+    assert "[REDACTED_EMAIL]" in r.redact_text("a@b.com")
+
+
 async def test_pii_redaction_middleware_redacts_result():
     h = Harness(name="t", middleware=[PIIRedaction()])
 
