@@ -93,3 +93,15 @@ async def test_pii_redaction_middleware_redacts_result():
 
     client = HarnessTestClient(h, principal=MockPrincipal())
     assert (await client.call("leak"))["email"] == "[REDACTED_EMAIL]"
+
+
+async def test_pii_redaction_middleware_redacts_arguments():
+    h = Harness(name="t", middleware=[PIIRedaction(redact_arguments=True, redact_result=False)])
+
+    @h.tool()
+    async def echo(note: str) -> dict:
+        return {"note": note}
+
+    client = HarnessTestClient(h, principal=MockPrincipal())
+    result = await client.call("echo", {"note": "contact secret@corp.com"})
+    assert result["note"] == "contact [REDACTED_EMAIL]"
