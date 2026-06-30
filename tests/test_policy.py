@@ -52,6 +52,12 @@ async def test_allow_list_glob_tools():
     assert await client.call("search_customer", {"customer_id": "c1"})
 
 
+async def test_allow_list_default_allow_grants_unmatched():
+    h = _build(AllowList([Rule(teams={"finance"}, tools=["search_customer"])], default_allow=True))
+    client = HarnessTestClient(h, principal=MockPrincipal("svc-a", team="platform"))
+    assert (await client.call("search_customer", {"customer_id": "c1"}))["id"] == "c1"
+
+
 async def test_deny_list_blocks_matching():
     h = _build(DenyList([Rule(principals={"svc-bad"})]))
     bad = HarnessTestClient(h, principal=MockPrincipal("svc-bad"))
@@ -75,6 +81,32 @@ async def test_allow_list_from_yaml(tmp_path):
     assert await client.call("search_customer", {"customer_id": "c1"})
 
 
+async def test_allow_list_from_yaml_bare_list(tmp_path):
+    policy = tmp_path / "p.yaml"
+    policy.write_text(
+        "- teams: [finance]\n"
+        "  tools: [search_customer]\n",
+        encoding="utf-8",
+    )
+    h = _build(AllowList.from_yaml(policy))
+    client = HarnessTestClient(h, principal=MockPrincipal("svc-a", team="finance"))
+    assert await client.call("search_customer", {"customer_id": "c1"})
+
+
+async def test_deny_list_from_yaml(tmp_path):
+    policy = tmp_path / "p.yaml"
+    policy.write_text(
+        "- principals: [svc-bad]\n",
+        encoding="utf-8",
+    )
+    h = _build(DenyList.from_yaml(policy))
+    bad = HarnessTestClient(h, principal=MockPrincipal("svc-bad"))
+    good = HarnessTestClient(h, principal=MockPrincipal("svc-ok"))
+    with pytest.raises(PolicyDenied):
+        await bad.call("search_customer", {"customer_id": "c1"})
+    assert await good.call("search_customer", {"customer_id": "c1"})
+
+
 def test_pii_redactor_patterns():
     r = PIIRedactor()
     assert r.redact_text("reach me at a@b.com") == "reach me at [REDACTED_EMAIL]"
@@ -82,6 +114,12 @@ def test_pii_redactor_patterns():
     nested = r.redact({"note": "call 415-555-1234", "ok": [1, "x@y.io"]})
     assert "[REDACTED_PHONE]" in nested["note"]
     assert nested["ok"][1] == "[REDACTED_EMAIL]"
+
+
+def test_pii_redactor_extra_patterns():
+    r = PIIRedactor(extra_patterns={"employee_id": (r"EMP-\d{4}", "[REDACTED_EMPLOYEE_ID]")})
+    assert r.redact_text("badge EMP-1234") == "badge [REDACTED_EMPLOYEE_ID]"
+    assert "[REDACTED_EMAIL]" in r.redact_text("a@b.com")
 
 
 async def test_pii_redaction_middleware_redacts_result():
@@ -93,3 +131,15 @@ async def test_pii_redaction_middleware_redacts_result():
 
     client = HarnessTestClient(h, principal=MockPrincipal())
     assert (await client.call("leak"))["email"] == "[REDACTED_EMAIL]"
+
+
+async def test_pii_redaction_middleware_redacts_arguments():
+    h = Harness(name="t", middleware=[PIIRedaction(redact_arguments=True, redact_result=False)])
+
+    @h.tool()
+    async def echo(note: str) -> dict:
+        return {"note": note}
+
+    client = HarnessTestClient(h, principal=MockPrincipal())
+    result = await client.call("echo", {"note": "contact secret@corp.com"})
+    assert result["note"] == "contact [REDACTED_EMAIL]"

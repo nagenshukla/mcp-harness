@@ -44,6 +44,27 @@ async def test_api_key_rotation_add_and_revoke():
     assert await auth.authenticate({"x-api-key": "sk-new"}) is None
 
 
+async def test_api_key_loader_supersedes_static_keys():
+    current = {"sk-a": {"id": "svc-a"}}
+    auth = APIKeyAuth(keys={"sk-stale": {"id": "svc-stale"}}, key_loader=lambda: current)
+    assert await auth.authenticate({"x-api-key": "sk-stale"}) is None
+    assert (await auth.authenticate({"x-api-key": "sk-a"})).id == "svc-a"
+    current["sk-b"] = {"id": "svc-b"}
+    assert (await auth.authenticate({"x-api-key": "sk-b"})).id == "svc-b"
+
+
+async def test_api_key_principal_factory_overrides_default_mapping():
+    def make_principal(key, info):
+        from mcp_harness.core.principal import Principal
+
+        return Principal(id=f"custom:{info['id']}", auth_method="api_key")
+
+    auth = APIKeyAuth(keys={"sk-1": {"id": "svc-a"}}, principal_factory=make_principal)
+    principal = await auth.authenticate({"x-api-key": "sk-1"})
+    assert principal is not None
+    assert principal.id == "custom:svc-a"
+
+
 async def test_anonymous_default_allows_calls():
     h = _harness_with(AnonymousAuth())
     assert await h.dispatch("whoami", {}, headers={}) == "ok"
@@ -56,6 +77,16 @@ async def test_chained_falls_back_to_anonymous():
     # No key -> anonymous fallback.
     anon = await auth.authenticate({})
     assert anon is not None and anon.anonymous
+
+
+async def test_chained_rejects_empty_backends():
+    with pytest.raises(ValueError):
+        ChainedAuth([])
+
+
+async def test_chained_returns_none_when_all_backends_fail():
+    auth = ChainedAuth([APIKeyAuth(keys={"sk-1": {"id": "svc-a"}})])
+    assert await auth.authenticate({}) is None
 
 
 async def test_injected_principal_bypasses_auth():

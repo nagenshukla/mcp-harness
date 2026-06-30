@@ -8,6 +8,7 @@ import pytest
 
 from mcp_harness import Harness, QuotaExceeded
 from mcp_harness.governance import Quotas
+from mcp_harness.governance.quotas import InMemoryQuotaStore, RedisQuotaStore
 from mcp_harness.testing import HarnessTestClient, MockPrincipal
 
 
@@ -65,6 +66,26 @@ async def test_concurrency_limit_rejects_second_caller():
     assert await first == "done"
     # Slot released -> a subsequent call succeeds (release event is already set).
     assert await client.call("slow") == "done"
+
+
+def test_release_slot_decrements_without_clearing_when_others_held():
+    store = InMemoryQuotaStore()
+    assert store.acquire_slot("k", limit=2)
+    assert store.acquire_slot("k", limit=2)
+    store.release_slot("k")
+    # One slot still held -> the next acquire must respect the remaining count.
+    assert store.acquire_slot("k", limit=2)
+    assert not store.acquire_slot("k", limit=2)
+
+
+def test_redis_quota_store_is_unimplemented_extension_point():
+    store = RedisQuotaStore(client=object())
+    with pytest.raises(NotImplementedError):
+        store.rate_check("k", 10)
+    with pytest.raises(NotImplementedError):
+        store.acquire_slot("k", 1)
+    with pytest.raises(NotImplementedError):
+        store.release_slot("k")
 
 
 async def test_no_limits_passes_through():
