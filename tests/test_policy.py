@@ -81,6 +81,18 @@ async def test_allow_list_from_yaml(tmp_path):
     assert await client.call("search_customer", {"customer_id": "c1"})
 
 
+async def test_allow_list_from_yaml_bare_list(tmp_path):
+    policy = tmp_path / "p.yaml"
+    policy.write_text(
+        "- teams: [finance]\n"
+        "  tools: [search_customer]\n",
+        encoding="utf-8",
+    )
+    h = _build(AllowList.from_yaml(policy))
+    client = HarnessTestClient(h, principal=MockPrincipal("svc-a", team="finance"))
+    assert await client.call("search_customer", {"customer_id": "c1"})
+
+
 async def test_deny_list_from_yaml(tmp_path):
     policy = tmp_path / "p.yaml"
     policy.write_text(
