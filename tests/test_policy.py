@@ -52,6 +52,12 @@ async def test_allow_list_glob_tools():
     assert await client.call("search_customer", {"customer_id": "c1"})
 
 
+async def test_allow_list_default_allow_grants_unmatched():
+    h = _build(AllowList([Rule(teams={"finance"}, tools=["search_customer"])], default_allow=True))
+    client = HarnessTestClient(h, principal=MockPrincipal("svc-a", team="platform"))
+    assert (await client.call("search_customer", {"customer_id": "c1"}))["id"] == "c1"
+
+
 async def test_deny_list_blocks_matching():
     h = _build(DenyList([Rule(principals={"svc-bad"})]))
     bad = HarnessTestClient(h, principal=MockPrincipal("svc-bad"))
