@@ -71,6 +71,33 @@ if __name__ == "__main__":
     harness.run()  # stdio by default; transport="streamable-http" for HTTP
 ```
 
+## Already have a server? Wrap it in one line
+
+Keep every `@server.tool()` exactly as it is — `from_fastmcp` adopts an existing `FastMCP`
+instance and routes its tools through the pipeline, preserving their schemas:
+
+```python
+from mcp.server.fastmcp import FastMCP
+from mcp_harness import Harness
+from mcp_harness.governance import CostTracking, Quotas
+
+server = FastMCP("my-mcp")
+
+@server.tool()
+async def search(q: str) -> dict:
+    return {"hits": []}
+
+harness = Harness.from_fastmcp(server, middleware=[CostTracking(), Quotas(per_principal_per_minute=60)])
+harness.run()
+```
+
+Or scaffold it from the CLI, without touching your file:
+
+```bash
+mcp-harness wrap server.py     # writes governed_server.py next to it
+mcp-harness init my-mcp        # scaffold a fresh governed server
+```
+
 Then attribute spend:
 
 ```console
@@ -108,7 +135,7 @@ or stack the whole thing.
 | `mcp_harness.policy` | `AllowList` / `DenyList` (YAML, argument constraints), `PIIRedactor` |
 | `mcp_harness.resilience` | `CircuitBreaker`, `Retry` decorators for individual tools |
 | `mcp_harness.testing` | `HarnessTestClient`, `MockPrincipal`, pytest fixtures |
-| `mcp-harness` CLI | `daily-rollup` per-cost-center spend reports |
+| `mcp-harness` CLI | `daily-rollup` spend reports, `wrap` an existing server, `init` a new one |
 
 Optional integrations degrade gracefully: `OTELTracing` is a no-op (warned once) without the
 `otel` extra; `Metrics` falls back to an in-memory backend without `prometheus-client`; cost token
